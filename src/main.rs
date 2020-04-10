@@ -58,79 +58,98 @@ impl Solver {
 
     fn find_one(
         &mut self,
-        piece_idx: &mut usize,
-        points_left: &mut u8,
+        piece_idx: usize,
+        points_left: u8,
         sol: &mut String,
         coll: &mut [Pieces],
     ) -> Result<(), RecError> {
         let pieces_left = self.n_pieces - sol.len() as u8;
-        //let mut current_piece = coll.get_mut(*piece_idx).unwrap();
 
-        println!(
-            "Starting: {:?}, {}, {}, {}",
-            current_piece, points_left, piece_idx, sol
-        );
+        // println!(
+        //     "Starting: {}, {:?}, Points left: {}, {}",
+        //     sol, coll[piece_idx], points_left, piece_idx
+        // );
 
-        if current_piece.val > *points_left {
+        if coll[piece_idx].val > points_left {
             // no room for this piece
-            println!("TooBig: {:?}, {}, {}", current_piece, points_left, sol);
-            return Err(RecError::TooBig);
-        }
-
-        if *points_left < pieces_left * current_piece.val {
-            // if we insert our piece, no other pieces will fit anymore, because the piece values are in icrementing order
-            println!("TooSmall: {:?}, {}, {}", current_piece, points_left, sol);
-            return Err(RecError::TooSmall);
-        }
-
-        if pieces_left == 1 && (*points_left - current_piece.val > 0) {
-            println!("NoSolution: {:?}, {}, {}", current_piece, points_left, sol);
+            println!("TooBig: {:?}, {}, {}", coll[piece_idx], points_left, sol);
             return Err(RecError::NoSolution);
         }
 
-        *points_left -= current_piece.val;
-        current_piece.num -= 1;
+        if points_left < pieces_left * coll[piece_idx].val {
+            // if we insert our piece, no other pieces will fit anymore, because the piece values are in icrementing order
+            println!("TooSmall: {:?}, {}, {}", coll[piece_idx], points_left, sol);
+            return Err(RecError::TooSmall);
+        }
+
+        let points_left_after = points_left - coll[piece_idx].val;
+
+        if pieces_left == 1 && (points_left_after > 0) {
+            // println!(
+            //     "NoSolution: {:?}, {}, {}",
+            //     coll[piece_idx], points_left, sol
+            // );
+            return Err(RecError::TooSmall);
+        }
+
+        //*points_left -= coll[*piece_idx].val;
+        coll[piece_idx].num -= 1;
         // println!(
         //     "After change: current: {}, coll: {}",
         //     current_piece.num, coll[0].num
         // );
-        sol.push_str(&current_piece.chr.to_string());
+        sol.push_str(&coll[piece_idx].chr.to_string());
+        // println!("{} -> {}", sol, points_left_after);
 
-        if *points_left == 0 && pieces_left == 1 {
-            println!("Ok: {:?}, {}, {}", current_piece, points_left, sol);
+        if points_left_after == 0 && pieces_left == 1 {
+            println!("Ok: {:?}, {}, {}", coll[piece_idx], points_left_after, sol);
             return Ok(());
         } else {
+            let start_piece = coll[piece_idx];
+            let mut next_search_idx = piece_idx;
+
+            if coll[piece_idx].num == 0 {
+                next_search_idx += 1;
+            }
+
             loop {
-                if current_piece.num == 0 {
-                    *piece_idx += 1;
-                    if *piece_idx > self.n_pieces as usize {
-                        return Err(RecError::Done);
-                    }
+                if next_search_idx >= coll.len() as usize {
+                    return Err(RecError::Done);
                 }
-
-                println!(
-                    "Piece idx: {}, Piece.num: {}",
-                    *piece_idx, current_piece.num
-                );
-
-                match self.find_one(piece_idx, points_left, sol, coll) {
-                    Ok(sol) => return Ok(sol),
-                    Err(RecError::TooBig) => return Err(RecError::TooBig),
-                    Err(RecError::TooSmall) => {}
-                    Err(RecError::NoSolution) => {
-                        if current_piece.num == 0 {
-                            *piece_idx += 1;
-                            if *piece_idx > self.n_pieces as usize {
-                                return Err(RecError::Done);
-                            }
-                        } else {
-                            current_piece.num -= 1;
-                        }
-                        println!("NoSultion iter: {:?}", current_piece);
+                match self.find_one(next_search_idx, points_left_after, sol, coll) {
+                    Ok(sol) => {
+                        // TODO: yield
+                        // if coll[*piece_idx].num == 0 {
+                        //     *piece_idx += 1;
+                        // }
+                        return Ok(sol);
                     }
-                    Err(RecError::Done) => {
-                        println!("Done within inner loop?");
-                        return Err(RecError::Done);
+                    Err(RecError::TooBig) => {
+                        unreachable!("TooBig");
+                    }
+                    Err(RecError::TooSmall) => {
+                        next_search_idx += 1;
+                    }
+                    Err(RecError::Done) | Err(RecError::NoSolution) => {
+                        // we reached Z and there's no solution
+                        // remove ourself and allow iterating again
+
+                        for i in piece_idx..coll.len() {
+                            coll[i].num = self.collection[i].num;
+                        }
+                        let new_sol = sol[..sol.len() - 1].to_string();
+                        let old_sol = sol.clone();
+                        *sol = new_sol;
+                        next_search_idx += 1;
+                        if next_search_idx >= coll.len() {
+                            // println!(
+                            //     "RESETTING ERR {} -> {}. points left {},  in {:?}",
+                            //     old_sol, sol, points_left_after, start_piece
+                            // );
+                            return Err(RecError::NoSolution);
+                        }
+
+                        // println!("RESETTING LOOP {} -> {} in {:?}", old_sol, sol, start_piece);
                     }
                 }
             }
@@ -144,7 +163,7 @@ impl Solver {
         let mut this_sol = String::new();
         let mut coll = self.collection.clone();
 
-        match self.find_one(&mut 0, &mut points.clone(), &mut this_sol, &mut coll) {
+        match self.find_one(1, points, &mut this_sol, &mut coll) {
             Ok(_) => self.solution.push(this_sol),
             _ => panic!("HELP!"),
         }
