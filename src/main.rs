@@ -17,12 +17,6 @@ use std::iter::Iterator;
 
 10 points -Q (x1), Z (x1)
 */
-#[derive(Debug)]
-pub struct Piece {
-    pub chr: char,
-    pub val: u8,
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct Pieces {
     pub chr: char,
@@ -31,10 +25,9 @@ pub struct Pieces {
 }
 
 enum RecError {
-    TooBig,
     TooSmall,
     NoSolution,
-    Done,
+    SkipMe,
 }
 
 struct Solver {
@@ -65,47 +58,29 @@ impl Solver {
     ) -> Result<(), RecError> {
         let pieces_left = self.n_pieces - sol.len() as u8;
 
-        // println!(
-        //     "Starting: {}, {:?}, Points left: {}, {}",
-        //     sol, coll[piece_idx], points_left, piece_idx
-        // );
-
         if coll[piece_idx].val > points_left {
             // no room for this piece
-            println!("TooBig: {:?}, {}, {}", coll[piece_idx], points_left, sol);
             return Err(RecError::NoSolution);
         }
 
         if points_left < pieces_left * coll[piece_idx].val {
             // if we insert our piece, no other pieces will fit anymore, because the piece values are in icrementing order
-            println!("TooSmall: {:?}, {}, {}", coll[piece_idx], points_left, sol);
             return Err(RecError::TooSmall);
         }
 
         let points_left_after = points_left - coll[piece_idx].val;
 
         if pieces_left == 1 && (points_left_after > 0) {
-            // println!(
-            //     "NoSolution: {:?}, {}, {}",
-            //     coll[piece_idx], points_left, sol
-            // );
             return Err(RecError::TooSmall);
         }
 
-        //*points_left -= coll[*piece_idx].val;
         coll[piece_idx].num -= 1;
-        // println!(
-        //     "After change: current: {}, coll: {}",
-        //     current_piece.num, coll[0].num
-        // );
         sol.push_str(&coll[piece_idx].chr.to_string());
-        // println!("{} -> {}", sol, points_left_after);
 
         if points_left_after == 0 && pieces_left == 1 {
-            println!("Ok: {:?}, {}, {}", coll[piece_idx], points_left_after, sol);
+            self.solution.push((*sol).clone());
             return Ok(());
         } else {
-            let start_piece = coll[piece_idx];
             let mut next_search_idx = piece_idx;
 
             if coll[piece_idx].num == 0 {
@@ -113,43 +88,33 @@ impl Solver {
             }
 
             loop {
-                if next_search_idx >= coll.len() as usize {
-                    return Err(RecError::Done);
+                if next_search_idx >= coll.len() {
+                    *sol = sol[..sol.len() - 1].to_string();
+                    // if piece_idx == 0 {
+                    //     return Ok(());
+                    // }
+                    return Err(RecError::SkipMe);
                 }
                 match self.find_one(next_search_idx, points_left_after, sol, coll) {
-                    Ok(sol) => {
-                        // TODO: yield
-                        // if coll[*piece_idx].num == 0 {
-                        //     *piece_idx += 1;
-                        // }
-                        return Ok(sol);
-                    }
-                    Err(RecError::TooBig) => {
-                        unreachable!("TooBig");
+                    Ok(_) => {
+                        *sol = sol[..sol.len() - 1].to_string();
+                        next_search_idx += 1;
                     }
                     Err(RecError::TooSmall) => {
                         next_search_idx += 1;
                     }
-                    Err(RecError::Done) | Err(RecError::NoSolution) => {
-                        // we reached Z and there's no solution
-                        // remove ourself and allow iterating again
-
+                    Err(RecError::SkipMe) => {
                         for i in piece_idx..coll.len() {
                             coll[i].num = self.collection[i].num;
                         }
-                        let new_sol = sol[..sol.len() - 1].to_string();
-                        let old_sol = sol.clone();
-                        *sol = new_sol;
                         next_search_idx += 1;
-                        if next_search_idx >= coll.len() {
-                            // println!(
-                            //     "RESETTING ERR {} -> {}. points left {},  in {:?}",
-                            //     old_sol, sol, points_left_after, start_piece
-                            // );
-                            return Err(RecError::NoSolution);
-                        }
+                    }
+                    Err(RecError::NoSolution) => {
+                        // we reached Z and there's no solution
+                        // remove ourself and allow iterating again
 
-                        // println!("RESETTING LOOP {} -> {} in {:?}", old_sol, sol, start_piece);
+                        *sol = sol[..sol.len() - 1].to_string();
+                        return Err(RecError::SkipMe);
                     }
                 }
             }
@@ -161,12 +126,20 @@ impl Solver {
         self.points = points;
 
         let mut this_sol = String::new();
-        let mut coll = self.collection.clone();
 
-        match self.find_one(1, points, &mut this_sol, &mut coll) {
-            Ok(_) => self.solution.push(this_sol),
-            _ => panic!("HELP!"),
+        for idx in 0..self.collection.len() {
+            let mut coll = self.collection.clone();
+            match self.find_one(idx, points, &mut this_sol, &mut coll) {
+                _ => println!("{} done", coll[idx].chr),
+            }
         }
+
+        println!("{:?}", self.solution);
+        println!("{}", self.solution.len());
+
+        self.solution.sort();
+        self.solution.dedup();
+        println!("{}", self.solution.len());
 
         &self.solution
     }
@@ -202,15 +175,6 @@ impl Solver {
             ('Q', 10, 1),
             ('Z', 10, 1),
         ];
-        // let full_collection: Vec<_> = desc
-        //     .iter()
-        //     .flat_map(|(chr, val, num)| {
-        //         (0..*num).map(move |_| Piece {
-        //             chr: *chr,
-        //             val: *val,
-        //         })
-        //     })
-        //     .collect();
         let collection: Vec<_> = desc
             .iter()
             .map(|(chr, val, num)| Pieces {
@@ -225,7 +189,5 @@ impl Solver {
 
 fn main() {
     let mut solver = Solver::new();
-    let solution = solver.solve(7, 46);
-
-    println!("{:?}", solution);
+    solver.solve(7, 46);
 }
