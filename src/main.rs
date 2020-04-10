@@ -49,6 +49,19 @@ impl Solver {
         }
     }
 
+    fn max_size_of_last_n_elements(free_elements: u8) -> u8 {
+        match free_elements {
+            0 => 0,
+            1 => 10,
+            2 => 20,
+            3 => 28,
+            4 => 36,
+            5 => 41,
+            6 => 45,
+            _ => unreachable!("free elements"),
+        }
+    }
+
     fn find_one(
         &mut self,
         piece_idx: usize,
@@ -67,8 +80,11 @@ impl Solver {
             // if we insert our piece, no other pieces will fit anymore, because the piece values are in icrementing order
             return Err(RecError::TooSmall);
         }
-
         let points_left_after = points_left - coll[piece_idx].val;
+        if points_left_after > Solver::max_size_of_last_n_elements(pieces_left - 1) {
+            // there's no possible way to reach the points on this branch
+            return Err(RecError::SkipMe);
+        }
 
         if pieces_left == 1 && (points_left_after > 0) {
             return Err(RecError::TooSmall);
@@ -90,9 +106,6 @@ impl Solver {
             loop {
                 if next_search_idx >= coll.len() {
                     *sol = sol[..sol.len() - 1].to_string();
-                    // if piece_idx == 0 {
-                    //     return Ok(());
-                    // }
                     return Err(RecError::SkipMe);
                 }
                 match self.find_one(next_search_idx, points_left_after, sol, coll) {
@@ -112,7 +125,6 @@ impl Solver {
                     Err(RecError::NoSolution) => {
                         // we reached Z and there's no solution
                         // remove ourself and allow iterating again
-
                         *sol = sol[..sol.len() - 1].to_string();
                         return Err(RecError::SkipMe);
                     }
@@ -127,26 +139,22 @@ impl Solver {
 
         let mut this_sol = String::new();
 
+        let mut coll = self.collection.clone();
         for idx in 0..self.collection.len() {
-            let mut coll = self.collection.clone();
             match self.find_one(idx, points, &mut this_sol, &mut coll) {
-                _ => println!("{} done", coll[idx].chr),
+                _ => {}
             }
         }
-
-        println!("{:?}", self.solution);
         println!("{}", self.solution.len());
-
-        self.solution.sort();
-        self.solution.dedup();
-        println!("{}", self.solution.len());
+        let s = self.solution.join("\n");
+        println!("{}", s);
 
         &self.solution
     }
 
     fn setup() -> Vec<Pieces> {
         let desc = [
-            // char, value, amount
+            // char, value, number
             ('0', 0, 2),
             ('A', 1, 9),
             ('E', 1, 12),
