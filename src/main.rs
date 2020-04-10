@@ -49,19 +49,6 @@ impl Solver {
         }
     }
 
-    fn max_size_of_last_n_elements(free_elements: u8) -> u8 {
-        match free_elements {
-            0 => 0,
-            1 => 10,
-            2 => 20,
-            3 => 28,
-            4 => 36,
-            5 => 41,
-            6 => 45,
-            _ => unreachable!("free elements"),
-        }
-    }
-
     fn find_one(
         &mut self,
         piece_idx: usize,
@@ -72,28 +59,26 @@ impl Solver {
         let pieces_left = self.n_pieces - sol.len() as u8;
 
         if coll[piece_idx].val > points_left {
-            // no room for this piece
+            // no room for this piece -> parent is too big as well
             return Err(RecError::NoSolution);
         }
 
         if points_left < pieces_left * coll[piece_idx].val {
             // if we insert our piece, no other pieces will fit anymore, because the piece values are in icrementing order
+            // -> this peace is too small
             return Err(RecError::TooSmall);
         }
+
         let points_left_after = points_left - coll[piece_idx].val;
         if points_left_after > Solver::max_size_of_last_n_elements(pieces_left - 1) {
             // there's no possible way to reach the points on this branch
             return Err(RecError::SkipMe);
         }
-
-        if pieces_left == 1 && (points_left_after > 0) {
-            return Err(RecError::TooSmall);
-        }
-
         coll[piece_idx].num -= 1;
         sol.push_str(&coll[piece_idx].chr.to_string());
 
         if points_left_after == 0 && pieces_left == 1 {
+            // we found one!
             self.solution.push((*sol).clone());
             return Ok(());
         } else {
@@ -145,11 +130,23 @@ impl Solver {
                 _ => {}
             }
         }
-        println!("{}", self.solution.len());
         let s = self.solution.join("\n");
         println!("{}", s);
-
+        println!("{}", self.solution.len());
         &self.solution
+    }
+
+    fn max_size_of_last_n_elements(free_elements: u8) -> u8 {
+        match free_elements {
+            0 => 0,
+            1 => 10,
+            2 => 20,
+            3 => 28,
+            4 => 36,
+            5 => 41,
+            6 => 45,
+            _ => unreachable!("free elements"),
+        }
     }
 
     fn setup() -> Vec<Pieces> {
