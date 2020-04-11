@@ -49,7 +49,7 @@ impl Solver {
         }
     }
 
-    fn find_one(
+    fn find_all(
         &mut self,
         piece_idx: usize,
         points_left: u8,
@@ -65,7 +65,7 @@ impl Solver {
 
         if points_left < pieces_left * coll[piece_idx].val {
             // if we insert our piece, no other pieces will fit anymore, because the piece values are in icrementing order
-            // -> this peace is too small
+            // -> this piece is too small
             return Err(RecError::TooSmall);
         }
 
@@ -93,7 +93,7 @@ impl Solver {
                     *sol = sol[..sol.len() - 1].to_string();
                     return Err(RecError::SkipMe);
                 }
-                match self.find_one(next_search_idx, points_left_after, sol, coll) {
+                match self.find_all(next_search_idx, points_left_after, sol, coll) {
                     Ok(_) => {
                         *sol = sol[..sol.len() - 1].to_string();
                         next_search_idx += 1;
@@ -122,17 +122,14 @@ impl Solver {
         self.n_pieces = n_pieces;
         self.points = points;
 
-        let mut this_sol = String::new();
+        self.solution.clear();
 
         let mut coll = self.collection.clone();
         for idx in 0..self.collection.len() {
-            match self.find_one(idx, points, &mut this_sol, &mut coll) {
+            match self.find_all(idx, points, &mut String::new(), &mut coll) {
                 _ => {}
             }
         }
-        let s = self.solution.join("\n");
-        println!("{}", s);
-        println!("{}", self.solution.len());
         &self.solution
     }
 
@@ -194,5 +191,13 @@ impl Solver {
 
 fn main() {
     let mut solver = Solver::new();
-    solver.solve(7, 46);
+
+    for i in 0..=50 {
+        let solution = solver.solve(7, i);
+        println!("{}: {}", i, solution.len())
+    }
+
+    // let s = solution.join("\n");
+    // println!("{}", s);
+    // println!("{}", solution.len());
 }
