@@ -219,7 +219,7 @@ fn main() {
         let solution = solver.solve(7, i);
         println!("{}: {}", i, solution.len())
     }
-    println!("Took: {}s", now.elapsed().as_secs());
+    println!("Took: {}s", now.elapsed().as_millis() as f32 / 1000.0);
 
     // let solution = solver.solve(7, 46);
     // let s = solution.join("\n");
